@@ -53,13 +53,16 @@ ddsTxi <- ddsTxi[keep,]
 #run the DESeq pipeline for genes with counts greater than 20 only
 dds <- DESeq(ddsTxi)
 
+#export the DESeq data
+write_csv(rownames_to_column(as.data.frame(assay(dds))), file = "DESeq_data.csv")
+
 #variance stabilizing transformation for visualization
 vsd <- vst(dds, blind=TRUE)
 
 #plot the PCA
 #plotPCA(vsd, intgroup="condition")
 dat <- plotPCA(vsd, intgroup="condition", returnData=TRUE) %>% 
-  mutate(group = factor(group, levels=c("cyathophyll", "nectary", "involucre", "filiform", "m. stam.", "m. pistil.", "y. pistil.","y. stam.", "lg. primord.", "sm. primord.")))
+  mutate(group = factor(group, levels=c("cyathophyll", "nectary", "involucre", "filiform", "m. staminate", "m. pistillate", "y. pistillate","y. staminate", "lg. primordium", "sm. primordium")))
 
 #shape version
 p <- ggplot(dat,aes(x=PC1,y=PC2,
@@ -148,12 +151,12 @@ vsd_averaged$"cyathophyll"<- rowMeans(my_vsd[, grep("_B\\d$", colnames(my_vsd))]
 vsd_averaged$"nectary"<- rowMeans(my_vsd[, grep("_N\\d$", colnames(my_vsd))])
 vsd_averaged$"involucre"<- rowMeans(my_vsd[, grep("_S\\d$", colnames(my_vsd))])
 vsd_averaged$"filiform"<- rowMeans(my_vsd[, grep("_P\\d$", colnames(my_vsd))])
-vsd_averaged$"m. stam."<- rowMeans(my_vsd[, grep("_A\\d$", colnames(my_vsd))])
-vsd_averaged$"m. pistil."<- rowMeans(my_vsd[, grep("_G\\d$", colnames(my_vsd))])
-vsd_averaged$"y. pistil."<- rowMeans(my_vsd[, grep("_TG\\d$", colnames(my_vsd))])
-vsd_averaged$"y. stam."<- rowMeans(my_vsd[, grep("_TA\\d$", colnames(my_vsd))])
-vsd_averaged$"lg. primord."<- rowMeans(my_vsd[, grep("_LP\\d$", colnames(my_vsd))])
-vsd_averaged$"sm. primord."<- rowMeans(my_vsd[, grep("_SP\\d$", colnames(my_vsd))])
+vsd_averaged$"m. staminate"<- rowMeans(my_vsd[, grep("_A\\d$", colnames(my_vsd))])
+vsd_averaged$"m. pistillate"<- rowMeans(my_vsd[, grep("_G\\d$", colnames(my_vsd))])
+vsd_averaged$"y. pistillate"<- rowMeans(my_vsd[, grep("_TG\\d$", colnames(my_vsd))])
+vsd_averaged$"y. staminate"<- rowMeans(my_vsd[, grep("_TA\\d$", colnames(my_vsd))])
+vsd_averaged$"lg. primordium"<- rowMeans(my_vsd[, grep("_LP\\d$", colnames(my_vsd))])
+vsd_averaged$"sm. primordium"<- rowMeans(my_vsd[, grep("_SP\\d$", colnames(my_vsd))])
 
 
 #Plotting the floral genes of interest heatmap
@@ -181,11 +184,14 @@ pheatmap(
 
 #not scaled by row (can somewhat see relative levels of expression between genes)
 pheatmap(
-  floral_vsd, 
+  select(floral_vsd,-c("gene_ID", "class")), 
   cluster_rows=TRUE, 
   show_rownames=TRUE,
   cluster_cols=FALSE, 
-  #scale = "row"
+  #scale = "row", 
+  annotation_row = select(floral_vsd, "class"), 
+  annotation_colors = list(class=c(A="#CC79A7", B="#E69F00", C="#F0E442", D="#009E73", E="#0072B2", other="#000000")), 
+  angle_col = 45
 )
 
 ##The floral genes not included because the counts were too low
@@ -199,7 +205,7 @@ floral_genes[!(floral_genes$gene_ID %in% rownames(vsd_averaged)),]
 nectary_res <- results(dds, alpha=0.05,  contrast=c("condition","nectary","cyathophyll"))
 summary(nectary_res)
 nectary_res <- nectary_res[order(nectary_res$pvalue),]
-nectary_res_df <- subset(nectary_res, padj < 0.01) %>% 
+nectary_res_df <- subset(nectary_res, padj < 0.05) %>% 
   as.data.frame() %>% 
   rownames_to_column(var="gene_ID")
 nectary_res_df_annos <- left_join(nectary_res_df, my_annos, by= "gene_ID")
@@ -209,7 +215,7 @@ write_csv(nectary_res_df_annos, file = "nectary_res.csv")
 involucre_res <- results(dds, alpha=0.05,  contrast=c("condition","involucre","cyathophyll"))
 summary(involucre_res)
 involucre_res <- involucre_res[order(involucre_res$pvalue),]
-involucre_res_df <- subset(involucre_res, padj < 0.01) %>% 
+involucre_res_df <- subset(involucre_res, padj < 0.05) %>% 
   as.data.frame() %>% 
   rownames_to_column(var="gene_ID")
 involucre_res_df_annos <- left_join(involucre_res_df, my_annos, by= "gene_ID")
@@ -220,7 +226,7 @@ write_csv(involucre_res_df_annos, file = "involucre_res.csv")
 filiform_res <- results(dds, alpha=0.05,  contrast=c("condition","filiform","cyathophyll"))
 summary(filiform_res)
 filiform_res <- filiform_res[order(filiform_res$pvalue),]
-filiform_res_df <- subset(filiform_res, padj < 0.01) %>% 
+filiform_res_df <- subset(filiform_res, padj < 0.05) %>% 
   as.data.frame() %>% 
   rownames_to_column(var="gene_ID")
 filiform_res_df_annos <- left_join(filiform_res_df, my_annos, by= "gene_ID")
@@ -228,20 +234,20 @@ write_csv(filiform_res_df_annos, file = "filiform_res.csv")
 
 
 #mature staminate vs. cyathophyll
-m_stam_res <- results(dds, alpha=0.05,  contrast=c("condition","m. stam.","cyathophyll"))
+m_stam_res <- results(dds, alpha=0.05,  contrast=c("condition","m. staminate","cyathophyll"))
 summary(m_stam_res)
 m_stam_res <- m_stam_res[order(m_stam_res$pvalue),]
-m_stam_res_df <- subset(m_stam_res, padj < 0.01) %>% 
+m_stam_res_df <- subset(m_stam_res, padj < 0.05) %>% 
   as.data.frame() %>% 
   rownames_to_column(var="gene_ID")
 m_stam_res_df_annos <- left_join(m_stam_res_df, my_annos, by= "gene_ID")
 write_csv(m_stam_res_df_annos, file = "m_stam_res.csv")
 
 #mature pistillate vs. cyathophyll
-m_pistil_res <- results(dds, alpha=0.05,  contrast=c("condition","m. pistil.","cyathophyll"))
+m_pistil_res <- results(dds, alpha=0.05,  contrast=c("condition","m. pistillate","cyathophyll"))
 summary(m_pistil_res)
 m_pistil_res <- m_pistil_res[order(m_pistil_res$pvalue),]
-m_pistil_res_df <- subset(m_pistil_res, padj < 0.01) %>% 
+m_pistil_res_df <- subset(m_pistil_res, padj < 0.05) %>% 
   as.data.frame() %>% 
   rownames_to_column(var="gene_ID")
 m_pistil_res_df_annos <- left_join(m_pistil_res_df, my_annos, by= "gene_ID")
@@ -249,10 +255,10 @@ write_csv(m_pistil_res_df_annos, file = "m_pistil_res.csv")
 
 
 #young pistillate vs. cyathophyll
-y_pistil_res <- results(dds, alpha=0.05,  contrast=c("condition","y. pistil.","cyathophyll"))
+y_pistil_res <- results(dds, alpha=0.05,  contrast=c("condition","y. pistillate","cyathophyll"))
 summary(y_pistil_res)
 y_pistil_res <- y_pistil_res[order(y_pistil_res$pvalue),]
-y_pistil_res_df <- subset(y_pistil_res, padj < 0.01) %>% 
+y_pistil_res_df <- subset(y_pistil_res, padj < 0.05) %>% 
   as.data.frame() %>% 
   rownames_to_column(var="gene_ID")
 y_pistil_res_df_annos <- left_join(y_pistil_res_df, my_annos, by= "gene_ID")
@@ -260,30 +266,30 @@ write_csv(y_pistil_res_df_annos, file = "y_pistil_res.csv")
 
 
 #young staminate vs. cyathophyll
-y_stam_res <- results(dds, alpha=0.05,  contrast=c("condition","y. stam.","cyathophyll"))
+y_stam_res <- results(dds, alpha=0.05,  contrast=c("condition","y. staminate","cyathophyll"))
 summary(y_stam_res)
 y_stam_res <- y_stam_res[order(y_stam_res$pvalue),]
-y_stam_res_df <- subset(y_stam_res, padj < 0.01) %>% 
+y_stam_res_df <- subset(y_stam_res, padj < 0.05) %>% 
   as.data.frame() %>% 
   rownames_to_column(var="gene_ID")
 y_stam_res_df_annos <- left_join(y_stam_res_df, my_annos, by= "gene_ID")
 write_csv(y_stam_res_df_annos, file = "y_stam_res.csv")
 
 #large primordium vs. cyathophyll
-lg_primord_res <- results(dds, alpha=0.05,  contrast=c("condition","lg. primord.","cyathophyll"))
+lg_primord_res <- results(dds, alpha=0.05,  contrast=c("condition","lg. primordium","cyathophyll"))
 summary(lg_primord_res)
 lg_primord_res <- lg_primord_res[order(lg_primord_res$pvalue),]
-lg_primord_res_df <- subset(lg_primord_res, padj < 0.01) %>% 
+lg_primord_res_df <- subset(lg_primord_res, padj < 0.05) %>% 
   as.data.frame() %>% 
   rownames_to_column(var="gene_ID")
 lg_primord_res_df_annos <- left_join(lg_primord_res_df, my_annos, by= "gene_ID")
 write_csv(lg_primord_res_df_annos, file = "lg_primord_res.csv")
 
 #small primordium vs. cyathophyll
-sm_primord_res <- results(dds, alpha=0.05,  contrast=c("condition","sm. primord.","cyathophyll"))
+sm_primord_res <- results(dds, alpha=0.05,  contrast=c("condition","sm. primordium","cyathophyll"))
 summary(sm_primord_res)
 sm_primord_res <- sm_primord_res[order(sm_primord_res$pvalue),]
-sm_primord_res_df <- subset(sm_primord_res, padj < 0.01) %>% 
+sm_primord_res_df <- subset(sm_primord_res, padj < 0.05) %>% 
   as.data.frame() %>% 
   rownames_to_column(var="gene_ID")
 sm_primord_res_df_annos <- left_join(sm_primord_res_df, my_annos, by= "gene_ID")
@@ -291,43 +297,118 @@ write_csv(sm_primord_res_df_annos, file = "sm_primord_res.csv")
 
 
 #mature pistillate vs young pistillate
-p_age_res <- results(dds, alpha=0.05,  contrast=c("condition","m. pistil.","y. pistil."))
+p_age_res <- results(dds, alpha=0.05,  contrast=c("condition","m. pistillate","y. pistillate"))
 summary(p_age_res)
 p_age_res <- p_age_res[order(p_age_res$pvalue),]
-p_age_res_df <- subset(p_age_res, padj < 0.01) %>% 
+p_age_res_df <- subset(p_age_res, padj < 0.05) %>% 
   as.data.frame() %>% 
   rownames_to_column(var="gene_ID")
 p_age_res_df_annos <- left_join(p_age_res_df, my_annos, by= "gene_ID")
 write_csv(p_age_res_df_annos, file = "p_age_res.csv")
 
 #mature staminate vs young staminate
-s_age_res <- results(dds, alpha=0.05,  contrast=c("condition","m. stam.","y. stam."))
+s_age_res <- results(dds, alpha=0.05,  contrast=c("condition","m. staminate","y. staminate"))
 summary(s_age_res)
 s_age_res <- s_age_res[order(s_age_res$pvalue),]
-s_age_res_df <- subset(s_age_res, padj < 0.01) %>% 
+s_age_res_df <- subset(s_age_res, padj < 0.05) %>% 
   as.data.frame() %>% 
   rownames_to_column(var="gene_ID")
 s_age_res_df_annos <- left_join(s_age_res_df, my_annos, by= "gene_ID")
 write_csv(s_age_res_df_annos, file = "s_age_res.csv")
 
 #mature staminate vs mature pistillate
-mature_res <- results(dds, alpha=0.05,  contrast=c("condition","m. stam.","m. pistil."))
+mature_res <- results(dds, alpha=0.05,  contrast=c("condition","m. staminate","m. pistillate"))
 summary(mature_res)
 mature_res <- mature_res[order(mature_res$pvalue),]
-mature_res_df <- subset(mature_res, padj < 0.01) %>% 
+mature_res_df <- subset(mature_res, padj < 0.05) %>% 
   as.data.frame() %>% 
   rownames_to_column(var="gene_ID")
 mature_res_df_annos <- left_join(mature_res_df, my_annos, by= "gene_ID")
 write_csv(mature_res_df_annos, file = "m_stam_vs_pistil_res.csv")
 
 #young staminate vs young pistillate
-young_res <- results(dds, alpha=0.05,  contrast=c("condition","y. stam.","y. pistil."))
+young_res <- results(dds, alpha=0.05,  contrast=c("condition","y. staminate","y. pistillate"))
 summary(young_res)
 young_res <- young_res[order(young_res$pvalue),]
-young_res_df <- subset(young_res, padj < 0.01) %>% 
+young_res_df <- subset(young_res, padj < 0.05) %>% 
   as.data.frame() %>% 
   rownames_to_column(var="gene_ID")
 young_res_df_annos <- left_join(young_res_df, my_annos, by= "gene_ID")
 write_csv(young_res_df_annos, file = "y_stam_vs_pistil_res.csv")
 
+#filiform vs mature staminate
+fil_vs_stam_res <- results(dds, alpha=0.05,  contrast=c("condition","filiform","m. staminate"))
+summary(fil_vs_stam_res)
+fil_vs_stam_res <- fil_vs_stam_res[order(fil_vs_stam_res$pvalue),]
+fil_vs_stam_res_df <- subset(fil_vs_stam_res, padj < 0.05) %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var="gene_ID")
+fil_vs_stam_res_df_annos <- left_join(fil_vs_stam_res_df, my_annos, by= "gene_ID")
+write_csv(fil_vs_stam_res_df_annos, file = "fil_vs_stam_res.csv")
+
+
 #copied and pasted all of these csvs into the same Excel file for supplementary info
+
+##DOING MORE STRINGENT
+
+my_floral <- floral_vsd %>% 
+  select(gene_ID) %>% 
+  rownames_to_column(var = "name") 
+
+p_val_data <- left_join(my_floral, m_pistil_res_df %>% 
+                          select(padj,gene_ID)
+                      , by="gene_ID") %>% 
+  rename(m_pistil=padj)
+
+p_val_data <- left_join(p_val_data, m_stam_res_df %>% 
+                          select(padj,gene_ID)
+                      , by="gene_ID") %>% 
+  rename(m_stam=padj)
+
+p_val_data <- left_join(p_val_data, y_stam_res_df %>% 
+                          select(padj,gene_ID)
+                      , by="gene_ID") %>% 
+  rename(y_stam=padj)
+
+p_val_data <- left_join(p_val_data, y_pistil_res_df %>% 
+                          select(padj,gene_ID)
+                      , by="gene_ID") %>% 
+  rename(y_pistil=padj)
+
+p_val_data <- left_join(p_val_data, filiform_res_df %>% 
+                          select(padj,gene_ID)
+                      , by="gene_ID") %>% 
+  rename(filiform=padj)
+
+p_val_data <- left_join(p_val_data, involucre_res_df %>% 
+                          select(padj,gene_ID)
+                      , by="gene_ID") %>% 
+  rename(involucre=padj)
+
+p_val_data <- left_join(p_val_data, nectary_res_df %>% 
+                          select(padj,gene_ID)
+                      , by="gene_ID") %>% 
+  rename(nectary=padj)
+
+p_val_data <- left_join(p_val_data, lg_primord_res_df %>% 
+                          select(padj,gene_ID)
+                        , by="gene_ID") %>% 
+  rename(lg_primord=padj)
+
+p_val_data <- left_join(p_val_data, sm_primord_res_df %>% 
+                          select(padj,gene_ID)
+                        , by="gene_ID") %>% 
+  rename(sm_primord=padj)
+
+p_val_data <- left_join(p_val_data, mature_res_df %>% 
+                          select(padj,gene_ID)
+                        , by="gene_ID") %>% 
+  rename(mature=padj)
+
+p_val_data <- left_join(p_val_data, young_res_df %>% 
+                          select(padj,gene_ID)
+                        , by="gene_ID") %>% 
+  rename(young=padj)
+
+write_csv(p_val_data, file = "p_val_data.csv")
+
